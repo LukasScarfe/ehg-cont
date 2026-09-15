@@ -125,6 +125,18 @@ feature CSV/JSON export.
 
 ## Changelog
 - 1.0.0 (2026-09-15): initial plan; leaner 2-agent + skeleton-first execution shape.
+- Phase 1 complete (2026-09-15): two parallel Sonnet agents, disjoint files, both self-tests green
+  and orchestrator-reverified. **Agent DATA**: all 98 records built at `downsample_fs=20`
+  (budget loop `[20,15,10]` in place but not needed), total `docs/data/` = 88.42 MB (< 150 MB),
+  no channel drops; reload/round-trip + `record_summary.csv` C/(c) cross-check pass (933 events).
+  **Agent ENGINE**: `list_detectors()`/`run_detector()` implemented against 8 browser-safe detectors
+  (baseline_rms · dsp_energy ×4 · dsp_freq: zcr_burst + wavelet_energy · physio_spectral); offline
+  numeric-parity gate exact (max abs diff 0.0 vs `src/`); synced modules byte-identical to source.
+  Ownership note: `scripts/sync_src.py` assigned solely to ENGINE (DATA didn't need it) → zero shared
+  files. Two follow-ups for Phase 2 `engine.js`: (1) `manifest.json.pyodide_packages=["pywt"]` — must
+  `pyodide.loadPackage("pywt")` before `runDetector("wavelet_energy")`; (2) `config.py` is a trimmed
+  browser-safe subset (original's import-time `os.makedirs` stripped), per §0. Headless browser
+  regression (Playwright/Chromium): skeleton still boots, all 18 py files load, bandpass green.
 - Phase 0 complete (2026-09-15): walking skeleton green on `ice002_p_2of3`.
   **GATE PASSED** — Pyodide 0.26.4 + numpy/scipy load and run a real `filters.bandpass`
   in-browser (~114 ms), `DecompressionStream` gunzips the channel-major `.f16.gz`, uPlot

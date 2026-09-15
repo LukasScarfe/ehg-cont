@@ -3,13 +3,27 @@
   "root": "py",
   "sys_path": "/py",
   "entry": "web_engine",
+  "pyodide_packages": [
+    "pywt"
+  ],
   "files": [
     "web_engine.py",
     "_whitelist.py",
     "src/__init__.py",
     "src/preprocessing/__init__.py",
     "src/features/__init__.py",
+    "src/methods/__init__.py",
+    "src/evaluation/__init__.py",
     "src/preprocessing/filters.py",
-    "src/features/features.py"
+    "src/features/features.py",
+    "src/evaluation/metrics.py",
+    "src/methods/base.py",
+    "src/methods/_dsp_common.py",
+    "src/methods/physio_common.py",
+    "src/methods/baseline_rms.py",
+    "src/methods/dsp_energy.py",
+    "src/methods/dsp_freq.py",
+    "src/methods/physio_spectral.py",
+    "src/config.py"
   ]
 }

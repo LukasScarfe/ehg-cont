@@ -4,9 +4,10 @@ web_engine.py — Pyodide entrypoint. Reuses the REAL src/ signal-processing cod
 callable both from the browser (via engine.js) and from native CPython (Agent
 ENGINE's offline numeric-parity self-test in Phase 1).
 
-Phase 0 scope: process() + extract_features() are real (they exercise the
-filters/features reuse the skeleton must prove). list_detectors()/run_detector()
-are stubs owned by Agent ENGINE in Phase 1 (they read _whitelist.py).
+process() + extract_features() (Phase 0) exercise the filters/features reuse.
+list_detectors()/run_detector() (Phase 1, Agent ENGINE) dispatch to the REAL
+detector REGISTRY for exactly the modules listed in _whitelist.py — never
+`import src.methods` directly, which would auto-load DL/torch detectors.
 """
 from __future__ import annotations
 
@@ -81,11 +82,86 @@ def extract_features(sig, fs, win_s, hop_s) -> dict:
     return {"names": names, "t_s": np.asarray(t_s, np.float32), "matrix": matrix}
 
 
+def _load_registry() -> dict:
+    """Import ONLY the modules listed in _whitelist.BROWSER_DETECTORS (never
+    `import src.methods`, which would auto-load DL/torch modules), then return
+    the REAL detector REGISTRY (methods/base.py), filtered to just those
+    whitelisted modules (defensive — REGISTRY is a shared module-level dict)."""
+    import importlib
+    from _whitelist import BROWSER_DETECTORS
+
+    for mod_name in BROWSER_DETECTORS:
+        importlib.import_module(mod_name)
+
+    from src.methods.base import REGISTRY
+
+    return {n: c for n, c in REGISTRY.items() if c.__module__ in BROWSER_DETECTORS}
+
+
+def _jsonable(obj):
+    """Recursively convert tuples -> lists and numpy scalars -> python scalars
+    so a detector's default_params dict is JSON-serialisable."""
+    if isinstance(obj, dict):
+        return {k: _jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonable(v) for v in obj]
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    return obj
+
+
+def _event_to_dict(ev) -> dict:
+    """Map a src.evaluation.metrics.DetectedEvent onto the CONTRACTS §6 shape
+    (onset/offset/peak in seconds, score float; the event's own `strength`
+    field is not part of the frozen shape and is dropped here)."""
+    return {
+        "onset": float(ev.onset),
+        "offset": float(ev.offset) if ev.offset is not None else None,
+        "peak": float(ev.peak) if ev.peak is not None else None,
+        "score": float(ev.score) if ev.score is not None else None,
+    }
+
+
 def list_detectors() -> list:
-    """Phase 1 (Agent ENGINE): enumerate browser-safe detectors from _whitelist.py."""
-    return []
+    """Enumerate browser-safe detectors from _whitelist.py (CONTRACTS §6)."""
+    registry = _load_registry()
+    out = []
+    for name in sorted(registry):
+        cls = registry[name]
+        out.append({
+            "name": cls.name,
+            "family": cls.family,
+            "causal": bool(cls.causal),
+            "params": _jsonable(cls.default_params),
+        })
+    return out
 
 
 def run_detector(name, sig, fs, params) -> dict:
-    """Phase 1 (Agent ENGINE): dispatch to a whitelisted detector."""
-    raise NotImplementedError("run_detector is implemented in Phase 1 (Agent ENGINE)")
+    """Dispatch to a whitelisted detector and return the CONTRACTS §6 shape.
+
+    `sig` may be 1-D or (C, N); each whitelisted detector reduces multichannel
+    input itself (np.atleast_2d + its own fuse step), per CONTRACTS §6's rule
+    ("reduce per the detector's own contract").
+    """
+    registry = _load_registry()
+    if name not in registry:
+        raise ValueError(f"unknown or non-whitelisted detector: {name!r}")
+    cls = registry[name]
+
+    from src.config import Recording
+
+    x = np.atleast_2d(np.asarray(sig, dtype=np.float64))
+    rec = Recording(rec_id="web", dataset="web", modality="EHG",
+                    fs=float(fs), signals=x)
+
+    det = cls(**(params or {}))
+    events, stat = det.detect(rec)
+
+    stat_arr = None if stat is None else np.asarray(stat, dtype=np.float32)
+    return {
+        "events": [_event_to_dict(e) for e in events],
+        "stat": stat_arr,
+    }

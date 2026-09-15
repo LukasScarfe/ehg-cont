@@ -2,9 +2,8 @@
 """
 build_web_dataset.py — offline builder for the committed browser dataset.
 
-PHASE 0 SCOPE: emits *one* record end-to-end so the walking skeleton has real
-data to load. Phase 1 (Agent DATA) generalises the RECORDS loop to all 98
-contraction-bearing records and enforces the repo size budget.
+PHASE 1 SCOPE (Agent DATA): builds ALL 98 contraction-bearing records and
+enforces the repo size budget (<= ~150 MB total for docs/data/).
 
 For each record it:
   1. reads the WFDB triplet (.hea/.dat/.atr) from the isolated dataset,
@@ -15,10 +14,18 @@ For each record it:
   5. writes channel-major gzip (.f16.gz) per CONTRACTS §1,
   6. accumulates index.json + annotations.json entries per CONTRACTS §2/§3.
 
+Budget enforcement: builds the full 98-record set at a candidate
+`downsample_fs`, sums the gz bytes, and if the total exceeds the ~150 MB
+budget, retries at the next lower candidate rate (20 -> 15 -> 10 Hz) BEFORE
+ever considering dropping channels (channels are never dropped). The final
+chosen rate is what ends up committed to docs/data/ and recorded in
+index.json's `downsample_fs` field.
+
 Reproducible: pure function of the source files + the constants below.
 """
 from __future__ import annotations
 
+import glob
 import gzip
 import json
 import os
@@ -35,19 +42,26 @@ DATA_OUT = os.path.join(WEB_ROOT, "docs", "data")
 SRC_SIGNALS = os.path.abspath(os.path.join(
     WEB_ROOT, "..", "Icelandic16EHG_contractions", "signals"))
 
-# --- build parameters (locked by CONTRACTS; Phase 1 may lower fs for budget) ---
+# --- build parameters ---
 ORIG_FS = 200
-DOWNSAMPLE_FS = 20
 GAIN = 131.068
 CHANNELS = [f"EHG{i}" for i in range(1, 17)]        # ascending target order
 GRID = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]]
 
-# Phase 0: just one record. Phase 1 replaces this with all 98.
-RECORDS = ["ice002_p_2of3"]
+# Candidate downsample rates to try, in order, until total gz size <= BUDGET.
+# Never drop channels to save space — only lower the rate.
+CANDIDATE_FS = [20, 15, 10]
+BUDGET_BYTES = 150 * 1024 * 1024  # ~150 MB
 
 DEFINITE = {"C"}
 POSSIBLE = {"(c)"}
 KEEP_SYMBOLS = {"C", "(c)", "fm", "pm", "em", "pos"}
+
+
+def discover_records() -> list[str]:
+    """All *.hea basenames under SRC_SIGNALS, sorted."""
+    heas = sorted(glob.glob(os.path.join(SRC_SIGNALS, "*.hea")))
+    return [os.path.splitext(os.path.basename(h))[0] for h in heas]
 
 
 def _symbol_type(sym: str) -> str:
@@ -67,26 +81,23 @@ def _ascending_order(sig_names: list[str]) -> list[int]:
     return [idx[c] for c in CHANNELS]
 
 
-def build_record(rec_id: str) -> tuple[dict, list[dict], int]:
+def build_record(rec_id: str, downsample_fs: int) -> tuple[dict, list[dict], int, bytes]:
     path = os.path.join(SRC_SIGNALS, rec_id)
     rec = wfdb.rdrecord(path)                         # physical mV, (n, 16)
     order = _ascending_order(list(rec.sig_name))
     x = rec.p_signal[:, order].T.astype(np.float64)   # (16, n) ascending, mV
     n_orig = x.shape[1]
 
-    # anti-aliased decimation 200 -> DOWNSAMPLE_FS
+    # anti-aliased decimation 200 -> downsample_fs
     from math import gcd
-    g = gcd(ORIG_FS, DOWNSAMPLE_FS)
-    y = resample_poly(x, DOWNSAMPLE_FS // g, ORIG_FS // g, axis=-1)  # (16, n2) mV
+    g = gcd(ORIG_FS, downsample_fs)
+    y = resample_poly(x, downsample_fs // g, ORIG_FS // g, axis=-1)  # (16, n2) mV
     n_samples = y.shape[1]
 
     raw = np.rint(y * GAIN).astype(np.int16)          # back to int16
     raw = np.ascontiguousarray(raw)                   # channel-major (C order)
-
-    gz_path = os.path.join(DATA_OUT, f"{rec_id}.f16.gz")
-    with gzip.open(gz_path, "wb", compresslevel=9) as fh:
-        fh.write(raw.tobytes(order="C"))
-    n_bytes = os.path.getsize(gz_path)
+    payload = gzip.compress(raw.tobytes(order="C"), compresslevel=9)
+    n_bytes = len(payload)
 
     # annotations from the .atr (full symbol set retained)
     ann = wfdb.rdann(path, "atr")
@@ -99,7 +110,7 @@ def build_record(rec_id: str) -> tuple[dict, list[dict], int]:
         t_s = s / ORIG_FS
         events.append({
             "t_s": round(t_s, 3),
-            "sample": int(round(t_s * DOWNSAMPLE_FS)),
+            "sample": int(round(t_s * downsample_fs)),
             "symbol": sym,
             "type": _symbol_type(sym),
         })
@@ -120,20 +131,67 @@ def build_record(rec_id: str) -> tuple[dict, list[dict], int]:
         "file": f"{rec_id}.f16.gz",
         "bytes": n_bytes,
     }
-    return index_entry, events, n_bytes
+    return index_entry, events, n_bytes, payload
+
+
+def build_all(record_ids: list[str], downsample_fs: int):
+    """Build every record at a given rate; return (index_records, annotations,
+    total_bytes, payloads) without writing anything to disk yet."""
+    index_records = []
+    annotations = {}
+    payloads = {}
+    total_bytes = 0
+    for rec_id in record_ids:
+        entry, events, nb, payload = build_record(rec_id, downsample_fs)
+        index_records.append(entry)
+        annotations[rec_id] = events
+        payloads[rec_id] = payload
+        total_bytes += nb
+    return index_records, annotations, total_bytes, payloads
 
 
 def main() -> None:
     os.makedirs(DATA_OUT, exist_ok=True)
-    index_records = []
-    annotations = {}
+    record_ids = discover_records()
+    print(f"discovered {len(record_ids)} record(s) in {SRC_SIGNALS}")
+
+    chosen_fs = None
+    index_records = annotations = payloads = None
     total_bytes = 0
-    for rec_id in RECORDS:
-        entry, events, nb = build_record(rec_id)
-        index_records.append(entry)
-        annotations[rec_id] = events
-        total_bytes += nb
-        print(f"  {rec_id}: n={entry['n_samples']} bytes={nb} "
+    for i, fs_candidate in enumerate(CANDIDATE_FS):
+        print(f"building all records at downsample_fs={fs_candidate} Hz "
+              f"({'candidate ' + str(i + 1) + '/' + str(len(CANDIDATE_FS))})...")
+        index_records, annotations, total_bytes, payloads = build_all(
+            record_ids, fs_candidate)
+        print(f"  -> total gz bytes at {fs_candidate} Hz: {total_bytes} "
+              f"({total_bytes / 1e6:.2f} MB), budget {BUDGET_BYTES / 1e6:.0f} MB")
+        if total_bytes <= BUDGET_BYTES:
+            chosen_fs = fs_candidate
+            print(f"under budget at {fs_candidate} Hz -> choosing this rate "
+                  f"(no channel drop needed).")
+            break
+        print(f"over budget at {fs_candidate} Hz; "
+              f"{'trying lower rate' if i + 1 < len(CANDIDATE_FS) else 'no lower candidate left'}...")
+
+    if chosen_fs is None:
+        # Exhausted all candidates; still under budget requirement not met.
+        # Per instructions: never drop channels. Use the lowest candidate
+        # rate anyway (best effort) and flag loudly.
+        chosen_fs = CANDIDATE_FS[-1]
+        print(f"WARNING: budget not reachable even at {chosen_fs} Hz "
+              f"({total_bytes / 1e6:.2f} MB > {BUDGET_BYTES / 1e6:.0f} MB budget). "
+              f"Proceeding with {chosen_fs} Hz as the lowest allowed rate; "
+              f"channels were NOT dropped per instructions.")
+
+    # write payloads for the chosen rate
+    for rec_id, payload in payloads.items():
+        gz_path = os.path.join(DATA_OUT, f"{rec_id}.f16.gz")
+        with open(gz_path, "wb") as fh:
+            fh.write(payload)
+
+    for entry in index_records:
+        nb = entry["bytes"]
+        print(f"  {entry['id']}: n={entry['n_samples']} bytes={nb} "
               f"events={sum(entry['annotation_counts'].values())}")
 
     index = {
@@ -141,7 +199,7 @@ def main() -> None:
         "source": "Icelandic 16-electrode EHG Database (ice16ehgdb)",
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "orig_fs": ORIG_FS,
-        "downsample_fs": DOWNSAMPLE_FS,
+        "downsample_fs": chosen_fs,
         "dtype": "int16",
         "layout": "channel-major",
         "gain": GAIN,
@@ -155,6 +213,7 @@ def main() -> None:
         json.dump({"schema": "ehg-annotations/1.0.0", "records": annotations},
                   fh, indent=2)
 
+    print(f"chosen downsample_fs = {chosen_fs} Hz")
     print(f"wrote {len(index_records)} record(s), total {total_bytes} bytes "
           f"({total_bytes/1e6:.2f} MB) -> {DATA_OUT}")
 
