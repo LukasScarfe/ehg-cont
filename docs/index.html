@@ -3,46 +3,131 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EHG Explorer — walking skeleton</title>
+  <title>EHG Explorer</title>
   <link rel="stylesheet" href="vendor/uplot/uPlot.min.css" />
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
   <header>
-    <h1>EHG Explorer <span class="tag">Phase&nbsp;0 skeleton</span></h1>
-    <p class="sub">Icelandic 16-electrode EHG — one record, live in-browser DSP via Pyodide.</p>
+    <h1>EHG Explorer <span class="tag">Phase&nbsp;2</span></h1>
+    <p class="sub">Icelandic 16-electrode EHG — browse records, run in-browser DSP (Pyodide),
+       and overlay official contraction annotations.</p>
   </header>
 
-  <main>
-    <section class="controls">
-      <label>Record: <strong id="record-id">…</strong></label>
-      <label>Channel:
-        <select id="channel-select"></select>
-      </label>
-      <label>Band (Hz):
-        <input id="band-lo" type="number" step="0.01" value="0.34" style="width:5em" />
-        –
-        <input id="band-hi" type="number" step="0.01" value="1.0" style="width:5em" />
-      </label>
-      <button id="run-bandpass">Run bandpass (Pyodide)</button>
-      <label class="chk"><input id="toggle-others" type="checkbox" /> show fm/pm/em</label>
-    </section>
+  <!-- Record browser -->
+  <section class="recordbar">
+    <label>Type
+      <select id="type-filter">
+        <option value="all">all</option>
+        <option value="pregnancy">pregnancy</option>
+        <option value="labour">labour</option>
+      </select>
+    </label>
+    <label class="grow">Record
+      <select id="record-select"></select>
+    </label>
+    <button id="prev-record" title="previous">◀</button>
+    <button id="next-record" title="next">▶</button>
+    <span class="divider"></span>
+    <label class="local">Local full-res (.hea + .dat)
+      <input id="local-files" type="file" accept=".hea,.dat,.atr" multiple />
+    </label>
+    <button id="load-local">Load local</button>
+  </section>
 
-    <div id="status" class="status">Loading record…</div>
-    <div id="plot" class="plot"></div>
+  <div id="record-meta" class="meta"></div>
+  <div id="status" class="status">Loading…</div>
 
-    <section class="legend">
-      <span class="lg raw">raw</span>
-      <span class="lg filt">filtered</span>
-      <span class="lg cdef">C (definite)</span>
-      <span class="lg cpos">(c) (possible)</span>
-      <span class="lg cother">other</span>
-    </section>
+  <main class="layout">
+    <!-- Controls sidebar -->
+    <aside class="sidebar">
+      <section class="panel">
+        <h2>Channels</h2>
+        <div id="grid" class="grid"></div>
+        <div class="btn-row">
+          <button id="ch-all" class="ghost">All</button>
+          <button id="ch-none" class="ghost">None</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Filter &amp; transforms</h2>
+        <label class="chk"><input id="filt-enable" type="checkbox" checked /> bandpass</label>
+        <label class="inline">band (Hz)
+          <input id="band-lo" type="number" step="0.01" value="0.34" />
+          –
+          <input id="band-hi" type="number" step="0.01" value="1.0" />
+        </label>
+        <label class="chk"><input id="filt-causal" type="checkbox" /> causal (single-pass)</label>
+        <label class="chk"><input id="filt-env" type="checkbox" /> RMS envelope overlay</label>
+        <label class="chk"><input id="filt-psd" type="checkbox" /> Welch PSD</label>
+        <label class="chk"><input id="filt-spec" type="checkbox" /> spectrogram</label>
+        <div class="btn-row">
+          <button id="run-proc">Run processing</button>
+          <button id="clear-proc" class="ghost">Clear</button>
+        </div>
+        <div class="btn-row view-toggle">
+          <span class="muted small">view:</span>
+          <label class="radio"><input type="radio" name="view-src" id="src-raw" value="raw" checked /> raw</label>
+          <label class="radio"><input type="radio" name="view-src" id="src-filt" value="filtered" /> filtered</label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Annotations</h2>
+        <div id="ann-toggles" class="ann-toggles"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Features</h2>
+        <label class="inline">win (s) <input id="feat-win" type="number" step="1" value="30" /></label>
+        <label class="inline">hop (s) <input id="feat-hop" type="number" step="1" value="15" /></label>
+        <div class="btn-row">
+          <button id="run-feat">Extract</button>
+          <button id="export-csv" class="ghost" disabled>CSV</button>
+          <button id="export-json" class="ghost" disabled>JSON</button>
+        </div>
+        <div id="feat-summary" class="muted small"></div>
+        <div id="feat-table" class="feat-table"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Detector</h2>
+        <label class="inline grow">method
+          <select id="det-select"><option>loading…</option></select>
+        </label>
+        <div id="det-params" class="det-params"></div>
+        <div class="btn-row">
+          <button id="run-det">Run detector</button>
+          <button id="clear-det" class="ghost">Clear</button>
+        </div>
+        <div id="det-summary" class="muted small"></div>
+      </section>
+    </aside>
+
+    <!-- Plots -->
+    <div class="plots">
+      <div id="montage" class="plot"></div>
+      <div id="stat-plot" class="plot" style="display:none"></div>
+      <div class="plot-row">
+        <div id="psd" class="plot half" style="display:none"></div>
+        <div id="spec" class="plot half" style="display:none"></div>
+      </div>
+
+      <section class="legend">
+        <span class="lg cdef">C (definite)</span>
+        <span class="lg cpos">(c) (possible)</span>
+        <span class="lg cother">fm/pm/em/pos</span>
+        <span class="lg det">detector event</span>
+        <span class="lg env">envelope</span>
+      </section>
+    </div>
   </main>
 
   <footer>
-    <p>Source: Icelandic 16-electrode EHG Database (Alexandersson et al., 2015). Committed
-       data is a downsampled derivative — see <a href="../PLAN.md">PLAN.md</a>.</p>
+    <p>Source: Icelandic 16-electrode EHG Database (Alexandersson et al., 2015), via PhysioNet.
+       Committed data is a downsampled (20 Hz) derivative — full 200 Hz via the local-file
+       picker. See <a href="../PLAN.md">PLAN.md</a> / <a href="../CONTRACTS.md">CONTRACTS.md</a>.</p>
   </footer>
 
   <script src="vendor/uplot/uPlot.iife.min.js"></script>

@@ -124,6 +124,26 @@ feature CSV/JSON export.
 | Pyodide round-trip per slider tweak feels slow | debounce; lazy-load; optional JS instant-preview later |
 
 ## Changelog
+- Phase 2 complete (2026-09-15): coupled frontend built on the green skeleton (Opus, no
+  subagents) and verified headless (Playwright/Chromium) end-to-end, zero console errors.
+  Delivered: record browser (98 records, type filter, prev/next); local full-res WFDB picker
+  (§5 — format-16 de-interleave + ascending EHG1..16 reorder, verified on a real 200 Hz
+  746k-sample pair); 4×4 grid channel selector; multi-channel montage (DC-removed stacked
+  traces, raw/filtered toggle, RMS-envelope overlay, C/(c)/fm/pm/em/pos annotation lines);
+  Welch PSD (log-y) + STFT spectrogram (canvas heatmap); windowed feature extraction with
+  CSV/JSON export; all 8 detectors with editable params, events-vs-truth spans + peaks +
+  detection-stat strip. Three findings fixed during integration:
+  1. **Pyodide moved into a Web Worker** (`engine.worker.js`; `engine.js` is now a proxy).
+     Main-thread latency during a full-record feature crunch measured **1 ms** — the UI
+     never freezes. This is the right home for all heavy compute (CONTRACTS §7 clarified).
+  2. **`web_engine.extract_features` was ~21× too slow**: it re-invoked `win_features`
+     once per (channel, feature-name) instead of once per channel (samp_entropy is O(L²)).
+     Full-record extraction went from >8 min → ~25 s native; offline parity gate still green.
+  3. **manifest package name `pywt` → `pywavelets`** (`loadPackage("pywt")` errors); extras
+     now load best-effort so a missing one only disables its detector (CONTRACTS §8).
+  Known remaining polish (Phase 3): full-record feature extraction is still ~1–2 min in
+  WASM (non-freezing but slow — candidate for per-window progress / region-limited extract);
+  PSD log-axis tick labels are coarse; `.atr` local-annotation parsing still deferred (§5).
 - 1.0.0 (2026-09-15): initial plan; leaner 2-agent + skeleton-first execution shape.
 - Phase 1 complete (2026-09-15): two parallel Sonnet agents, disjoint files, both self-tests green
   and orchestrator-reverified. **Agent DATA**: all 98 records built at `downsample_fs=20`

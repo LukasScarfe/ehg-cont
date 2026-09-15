@@ -4,7 +4,7 @@
   "sys_path": "/py",
   "entry": "web_engine",
   "pyodide_packages": [
-    "pywt"
+    "pywavelets"
   ],
   "files": [
     "web_engine.py",

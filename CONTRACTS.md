@@ -4,8 +4,9 @@
 > against exactly these shapes. Changing a contract is an orchestrator (Opus) decision,
 > recorded here with a version bump. Agents MUST NOT silently diverge.
 >
-> Version: 1.0.1 · Status: VALIDATED (Phase 0 walking skeleton green — Pyodide-on-Pages
-> confirmed, no fallback needed; §1–§7 unchanged, only §8 clarified re: vendored uPlot)
+> Version: 1.0.2 · Status: VALIDATED (Phase 2 frontend built on the green skeleton; §1–§7
+> public shapes unchanged. Clarifications only: §7 Pyodide now runs in a Web Worker
+> (same Engine API); §8 the wavelet package is `pywavelets`, not `pywt`.)
 
 ---
 
@@ -235,12 +236,19 @@ Engine.runDetector(name, record, chIndices, params) -> Promise<DetectionResult>
 
 - Pyodide is loaded **lazily** (only on first processing call) so raw traces render instantly.
 - Result shapes mirror §6 verbatim.
+- **Pyodide runs in a Web Worker** (`docs/js/engine.worker.js`); `engine.js` is a thin
+  promise-based postMessage proxy exposing exactly the API above. This keeps the main
+  thread free, so long jobs (feature extraction over a full record, detectors) never
+  freeze the UI. The public API and result shapes are unchanged (Phase-2 clarification).
 
 ---
 
 ## 8. External libraries / CSP (GitHub Pages)
 
-- Pyodide: pinned version from the official CDN (jsDelivr). Loaded lazily.
+- Pyodide: pinned version from the official CDN (jsDelivr). Loaded lazily (in the worker).
+  Extra packages go in `manifest.json.pyodide_packages`; the wavelet dependency is
+  **`pywavelets`** (imports as `pywt`) — `loadPackage("pywt")` fails. Loaded best-effort
+  so a missing optional package only disables the detector that needs it.
 - gunzip: `DecompressionStream('gzip')` where available; else a small pinned pure-JS fallback.
 - Plotting: **uPlot 1.6.31, vendored** in `docs/vendor/uplot/` (`uPlot.iife.min.js` + `uPlot.min.css`).
   Note: uPlot is NOT on cdnjs; it was fetched from the npm dist via jsDelivr and committed to the repo

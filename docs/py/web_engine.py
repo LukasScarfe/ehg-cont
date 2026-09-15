@@ -74,7 +74,12 @@ def extract_features(sig, fs, win_s, hop_s) -> dict:
         seg = x[:, a:a + L]
         if seg.shape[1] < L:
             break
-        fv = np.mean([[win_features(ch, fs)[k] for k in names] for ch in seg], axis=0)
+        # win_features is pure but non-trivial (samp_entropy is O(L^2)); call it
+        # ONCE per channel and read all feature keys from that dict, rather than
+        # once per (channel, feature-name) — a len(names)× speedup that keeps the
+        # returned values byte-identical (preserves the offline parity gate).
+        feats = [win_features(ch, fs) for ch in seg]
+        fv = np.mean([[fd[k] for k in names] for fd in feats], axis=0)
         rows.append(fv.astype(np.float32))
         t_s.append((a + L / 2) / fs)
 
