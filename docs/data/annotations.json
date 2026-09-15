@@ -1,0 +1,127 @@
+{
+  "schema": "ehg-annotations/1.0.0",
+  "records": {
+    "ice002_p_2of3": [
+      {
+        "t_s": 118.135,
+        "sample": 2363,
+        "symbol": "em",
+        "type": "other"
+      },
+      {
+        "t_s": 213.405,
+        "sample": 4268,
+        "symbol": "em",
+        "type": "other"
+      },
+      {
+        "t_s": 1150.88,
+        "sample": 23018,
+        "symbol": "C",
+        "type": "definite"
+      },
+      {
+        "t_s": 1240.08,
+        "sample": 24802,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 1480.52,
+        "sample": 29610,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 1540.86,
+        "sample": 30817,
+        "symbol": "(c)",
+        "type": "possible"
+      },
+      {
+        "t_s": 1720.605,
+        "sample": 34412,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 1874.31,
+        "sample": 37486,
+        "symbol": "(c)",
+        "type": "possible"
+      },
+      {
+        "t_s": 2020.395,
+        "sample": 40408,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 2200.14,
+        "sample": 44003,
+        "symbol": "C",
+        "type": "definite"
+      },
+      {
+        "t_s": 2260.475,
+        "sample": 45210,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 2320.18,
+        "sample": 46404,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 2380.52,
+        "sample": 47610,
+        "symbol": "(c)",
+        "type": "possible"
+      },
+      {
+        "t_s": 2680.31,
+        "sample": 53606,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 2860.06,
+        "sample": 57201,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 2920.08,
+        "sample": 58402,
+        "symbol": "(c)",
+        "type": "possible"
+      },
+      {
+        "t_s": 3040.125,
+        "sample": 60802,
+        "symbol": "(c)",
+        "type": "possible"
+      },
+      {
+        "t_s": 3184.94,
+        "sample": 63699,
+        "symbol": "C",
+        "type": "definite"
+      },
+      {
+        "t_s": 3249.72,
+        "sample": 64994,
+        "symbol": "fm",
+        "type": "other"
+      },
+      {
+        "t_s": 3640.02,
+        "sample": 72800,
+        "symbol": "fm",
+        "type": "other"
+      }
+    ]
+  }
+}

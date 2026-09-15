@@ -1,0 +1,15 @@
+{
+  "schema": "ehg-pymanifest/1.0.0",
+  "root": "py",
+  "sys_path": "/py",
+  "entry": "web_engine",
+  "files": [
+    "web_engine.py",
+    "_whitelist.py",
+    "src/__init__.py",
+    "src/preprocessing/__init__.py",
+    "src/features/__init__.py",
+    "src/preprocessing/filters.py",
+    "src/features/features.py"
+  ]
+}

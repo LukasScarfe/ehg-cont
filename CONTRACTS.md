@@ -4,7 +4,8 @@
 > against exactly these shapes. Changing a contract is an orchestrator (Opus) decision,
 > recorded here with a version bump. Agents MUST NOT silently diverge.
 >
-> Version: 1.0.0 · Status: DRAFT (pending Phase 0 skeleton validation)
+> Version: 1.0.1 · Status: VALIDATED (Phase 0 walking skeleton green — Pyodide-on-Pages
+> confirmed, no fallback needed; §1–§7 unchanged, only §8 clarified re: vendored uPlot)
 
 ---
 
@@ -241,7 +242,9 @@ Engine.runDetector(name, record, chIndices, params) -> Promise<DetectionResult>
 
 - Pyodide: pinned version from the official CDN (jsDelivr). Loaded lazily.
 - gunzip: `DecompressionStream('gzip')` where available; else a small pinned pure-JS fallback.
-- Plotting: one pinned library (uPlot preferred for large time series; Plotly acceptable). Pin exact version.
+- Plotting: **uPlot 1.6.31, vendored** in `docs/vendor/uplot/` (`uPlot.iife.min.js` + `uPlot.min.css`).
+  Note: uPlot is NOT on cdnjs; it was fetched from the npm dist via jsDelivr and committed to the repo
+  (Phase 0 finding). Vendoring avoids CDN/ORB risk on Pages. Do not switch back to a CDN for uPlot.
 - No build step required to *serve*; a bundler is optional. Keep imports CDN-pinned or vendored in `docs/vendor/`.
 
 ---

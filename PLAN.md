@@ -125,3 +125,11 @@ feature CSV/JSON export.
 
 ## Changelog
 - 1.0.0 (2026-09-15): initial plan; leaner 2-agent + skeleton-first execution shape.
+- Phase 0 complete (2026-09-15): walking skeleton green on `ice002_p_2of3`.
+  **GATE PASSED** — Pyodide 0.26.4 + numpy/scipy load and run a real `filters.bandpass`
+  in-browser (~114 ms), `DecompressionStream` gunzips the channel-major `.f16.gz`, uPlot
+  renders the trace with C/(c)/other overlays. No JS-DSP fallback needed; CONTRACTS §1–§7
+  stand. One finding: uPlot vendored to `docs/vendor/` (not on cdnjs) → CONTRACTS 1.0.1 §8.
+  Verified headless (Playwright/Chromium) since the claude-in-chrome extension was unavailable.
+  Known Phase-2 nit: raw + filtered share one y-axis, so the ~0.09 mV filtered trace looks
+  flat against the 0–25 mV raw DC — needs separate/normalised axes in the build-out.

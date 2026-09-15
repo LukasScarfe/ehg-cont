@@ -1,0 +1,74 @@
+{
+  "schema": "ehg-index/1.0.0",
+  "source": "Icelandic 16-electrode EHG Database (ice16ehgdb)",
+  "generated_utc": "2026-09-15T20:39:02Z",
+  "orig_fs": 200,
+  "downsample_fs": 20,
+  "dtype": "int16",
+  "layout": "channel-major",
+  "gain": 131.068,
+  "channels": [
+    "EHG1",
+    "EHG2",
+    "EHG3",
+    "EHG4",
+    "EHG5",
+    "EHG6",
+    "EHG7",
+    "EHG8",
+    "EHG9",
+    "EHG10",
+    "EHG11",
+    "EHG12",
+    "EHG13",
+    "EHG14",
+    "EHG15",
+    "EHG16"
+  ],
+  "grid": [
+    [
+      1,
+      2,
+      3,
+      4
+    ],
+    [
+      5,
+      6,
+      7,
+      8
+    ],
+    [
+      9,
+      10,
+      11,
+      12
+    ],
+    [
+      13,
+      14,
+      15,
+      16
+    ]
+  ],
+  "records": [
+    {
+      "id": "ice002_p_2of3",
+      "subject": "ice002",
+      "type": "pregnancy",
+      "n_samples": 74600,
+      "duration_s": 3730.0,
+      "ga_recording": "39/1",
+      "annotation_counts": {
+        "C": 3,
+        "(c)": 5,
+        "fm": 10,
+        "pm": 0,
+        "em": 2,
+        "pos": 0
+      },
+      "file": "ice002_p_2of3.f16.gz",
+      "bytes": 858860
+    }
+  ]
+}
